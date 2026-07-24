@@ -1,8 +1,10 @@
 # PatrowlIntel Labs
 
 Reproducible vulnerability labs — each folder ships a **Dockerized vulnerable
-application** and a **validated Nuclei template** that detects the flaw against
-the running instance.
+application**, a **validated Nuclei template** that detects the flaw against the
+running instance, and a machine-readable **`remediation.json`** with the CPEs,
+IOCs, vendor fix, and WAF signatures needed to detect, virtually patch, and
+remediate it.
 
 Built and maintained by the **[Patrowl](https://patrowl.io) Offensive Security
 Team**.
@@ -46,7 +48,39 @@ Each lab is self-contained:
 <lab>/
 ├── README.md            # root cause, spawn, manual PoC, detect, cleanup
 ├── Dockerfile | docker-compose.yml + setup.sh   # spawn the vulnerable app
-└── nuclei/*.yaml        # validated Nuclei v3 template(s)
+├── nuclei/*.yaml        # validated Nuclei v3 template(s)
+└── remediation.json     # CPEs, IOCs, vendor fix & WAF signatures (see below)
+```
+
+## Remediation data (`remediation.json`)
+
+Every lab carries a `remediation.json` — the same intelligence as the README,
+but **structured and machine-readable** so it drops straight into detection,
+SIEM, WAF, and asset-management pipelines. Each file describes:
+
+| Field | What it gives you |
+| --- | --- |
+| `exposure` | Classic TCP ports the app is reachable on (default `443`, plus `80`/`8080`/`8443`) and protocol. |
+| `affected_technologies` | Vendor, product, ecosystem, affected/fixed versions, and **CPE 2.3** strings for asset matching. |
+| `indicators_of_compromise` | **URLs/paths to monitor in logs**, request/body signatures, and behavioral IOCs of active exploitation. |
+| `vendor_advisory` | Links to the official advisory, plugin changelog/Trac, and the [intel.patrowl.io](https://intel.patrowl.io) entry. |
+| `remediation` | The primary fix (version to upgrade to), step-by-step actions, and mitigations when upgrading isn't possible. |
+| `waf` | Ready-to-adapt **WAF rule metadata**: target paths/params, regex signatures, combine logic, and false-positive notes. |
+
+**Use cases**
+
+- **Virtual patching / WAF** — turn the `waf` block into ModSecurity, Cloudflare,
+  or AWS WAF rules to block exploitation while you schedule the upgrade.
+- **Detection & threat hunting** — feed `indicators_of_compromise` into SIEM
+  queries and log monitors to catch exploitation attempts and past compromise.
+- **Asset & vulnerability management** — match the `cpe23` / version ranges
+  against your inventory (EASM, SBOM, scanners) to find exposed instances.
+- **Prioritisation & response** — combine `severity`/`cvss_vector` with
+  `exposure` to triage, and hand `remediation.steps` to the fixing team.
+
+```bash
+# e.g. list every affected CPE across all labs
+jq -r '.affected_technologies[].cpe23' */remediation.json
 ```
 
 ## Usage
