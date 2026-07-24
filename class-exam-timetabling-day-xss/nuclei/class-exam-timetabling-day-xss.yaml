@@ -1,0 +1,60 @@
+id: CVE-2026-16485
+
+info:
+  name: "SourceCodester Class and Exam Timetabling System 1.0 — Reflected XSS (admin/class.php day) (CVE-2026-16485)"
+  author: "Patrowl Security Team"
+  severity: medium
+  description: |
+    admin/class.php in SourceCodester Class and Exam Timetabling System V1.0
+    echoes the `day` GET parameter into the HTML response without any output
+    encoding. An unauthenticated attacker can inject arbitrary HTML/JavaScript
+    that executes in the victim's browser (reflected Cross-Site Scripting).
+  remediation: |
+    Apply context-aware output encoding to the `day` parameter (e.g.
+    htmlspecialchars($day, ENT_QUOTES)) and validate input against an allow-list
+    of weekday values. No official patch exists for V1.0.
+  reference:
+    - https://github.com/ashfaqsharif47-arch/Web-RCE/issues/1
+    - https://www.sourcecodester.com/php/11332/class-and-exam-timetabling.html
+    - https://intel.patrowl.io/cves/CVE-2026-16485
+  classification:
+    cvss-metrics: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
+    cve-id: CVE-2026-16485
+    cwe-id: CWE-79
+  metadata:
+    verified: true
+    detection-mode: remote
+    vendor: sourcecodester
+    product: class_and_exam_timetabling_system
+    ecosystem: php
+    fixed-version: "none"
+    shodan-query: 'http.title:"Class and Exam Timetabling System"'
+  tags: cve,cve2026,xss,sourcecodester,timetabling,php,reflected
+
+http:
+  - method: GET
+    path:
+      # Inert, unique probe: closes the attribute/tag context ( "> ) and injects
+      # a custom element with no event handler. It proves markup injection
+      # (angle brackets and quote reflected un-encoded) without executing code
+      # against real visitors.
+      - "{{BaseURL}}/admin/class.php?day=%22%3E%3Cptr-xss-probe%3E7f3a9c"
+
+    stop-at-first-match: true
+    matchers-condition: and
+    matchers:
+      - type: word
+        name: reflected-markup
+        part: body
+        words:
+          - '"><ptr-xss-probe>7f3a9c'
+
+      - type: word
+        name: html-response
+        part: header
+        words:
+          - "text/html"
+
+      - type: status
+        status:
+          - 200
