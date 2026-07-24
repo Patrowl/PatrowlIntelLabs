@@ -1,0 +1,109 @@
+{
+  "cves": ["CVE-2026-16485", "CVE-2026-16486"],
+  "title": "SourceCodester Class and Exam Timetabling System 1.0 — Reflected XSS via 'day' parameter",
+  "severity": "medium",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+  "cwe": ["CWE-79"],
+  "exposure": {
+    "default_tcp_port": 443,
+    "tcp_ports": [443, 80, 8080],
+    "protocol": "http",
+    "note": "Self-hosted PHP/Apache app (typically XAMPP). Reachable on whatever HTTP(S) port the site is served on."
+  },
+  "affected_technologies": [
+    {
+      "vendor": "sourcecodester",
+      "alt_vendor": "oretnom23",
+      "product": "Class and Exam Timetabling System",
+      "ecosystem": "php-webapp",
+      "cpe23": "cpe:2.3:a:sourcecodester:class_and_exam_timetabling_system:1.0:*:*:*:*:*:*:*",
+      "affected_versions": "1.0",
+      "fixed_version": "none",
+      "note": "No official patch exists for V1.0."
+    },
+    {
+      "vendor": "php",
+      "product": "PHP",
+      "cpe23": "cpe:2.3:a:php:php:*:*:*:*:*:*:*:*",
+      "note": "Runtime; not itself vulnerable."
+    }
+  ],
+  "preconditions": [
+    "No authentication required — the vulnerable admin pages echo the parameter before any access check on the reflection path."
+  ],
+  "indicators_of_compromise": {
+    "log_monitoring_urls": [
+      {"path": "/admin/class.php", "method": "GET", "parameter": "day", "cve": "CVE-2026-16485", "reason": "Echoes 'day' into HTML with no output encoding."},
+      {"path": "/admin/BSIS.php", "method": "GET", "parameter": "day", "cve": "CVE-2026-16486", "reason": "Echoes 'day' into HTML with no output encoding."}
+    ],
+    "request_signatures": [
+      "day= value containing HTML/JS injection: <script, %3Cscript, </script>, <svg, <img, onerror=, onload=, javascript:",
+      "Attribute/tag breakout markers in day=: \"> , '> , \"><",
+      "URL-encoded variants: %22%3E%3Cscript%3E , %3C%2Fscript%3E"
+    ],
+    "behavioral": [
+      "Referer or victim requests to /admin/class.php or /admin/BSIS.php with a scripted 'day' value delivered via a crafted link (email/chat) — reflected XSS requires victim interaction.",
+      "Outbound callbacks (data exfiltration / session theft) to attacker domains immediately following a reflected payload hit."
+    ]
+  },
+  "vendor_advisory": [
+    "https://github.com/ashfaqsharif47-arch/Web-RCE/issues/1",
+    "https://github.com/kurshidheba852-hub/My-cve-repository/issues/1",
+    "https://www.sourcecodester.com/php/11332/class-and-exam-timetabling.html",
+    "https://intel.patrowl.io/cves/CVE-2026-16485",
+    "https://intel.patrowl.io/cves/CVE-2026-16486"
+  ],
+  "remediation": {
+    "primary": "No official patch exists. Apply context-aware output encoding to the 'day' parameter and validate against an allow-list of weekday values.",
+    "steps": [
+      "Encode on output: echo htmlspecialchars($day, ENT_QUOTES, 'UTF-8'); at every sink that renders 'day'.",
+      "Validate on input: reject any 'day' value not in {Monday..Sunday} (or the app's expected day set) before use.",
+      "Enforce authentication/authorization on all /admin/* pages.",
+      "Add a Content-Security-Policy (e.g. default-src 'self'; script-src 'self') to blunt reflected-XSS impact.",
+      "Set the X-Content-Type-Options: nosniff header."
+    ],
+    "mitigations_if_upgrade_impossible": [
+      "Deploy the WAF virtual patch below.",
+      "Restrict /admin/ to trusted source IPs / behind authentication at the reverse proxy."
+    ]
+  },
+  "waf": {
+    "strategy": "virtual-patch",
+    "default_action": "block",
+    "target_paths": ["/admin/class.php", "/admin/BSIS.php"],
+    "target_methods": ["GET"],
+    "target_parameters": ["day"],
+    "signatures": [
+      {
+        "id": "cet-xss-tag-injection",
+        "location": "query_string",
+        "applies_to_param": "day",
+        "regex": "(?i)(%3C|<)\\s*(script|svg|img|iframe|body|object|embed|/script)",
+        "description": "HTML tag injection in the 'day' parameter."
+      },
+      {
+        "id": "cet-xss-event-handler",
+        "location": "query_string",
+        "applies_to_param": "day",
+        "regex": "(?i)(on[a-z]+\\s*=|javascript:)",
+        "description": "Inline event handler or javascript: URI in 'day'."
+      },
+      {
+        "id": "cet-xss-attribute-breakout",
+        "location": "query_string",
+        "applies_to_param": "day",
+        "regex": "(%22|%27|[\"'])\\s*(%3E|>)",
+        "description": "Quote+angle-bracket attribute/tag breakout in 'day'."
+      },
+      {
+        "id": "cet-day-allowlist",
+        "location": "query_string",
+        "applies_to_param": "day",
+        "positive_allowlist_regex": "^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$",
+        "description": "Preferred rule: block any 'day' value that is not a plain weekday name."
+      }
+    ],
+    "combine": "block if any negative signature matches, or (preferred) if the allow-list rule fails",
+    "false_positive_notes": "'day' is expected to be a weekday name; the positive allow-list is the most robust and lowest-false-positive rule."
+  }
+}
