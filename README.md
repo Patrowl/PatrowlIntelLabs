@@ -38,6 +38,7 @@ exposures before attackers do:
 | --- | --- | --- | --- |
 | [`events-manager-cve-2026-12987`](./events-manager-cve-2026-12987) | [CVE-2026-12987](https://intel.patrowl.io/cves/CVE-2026-12987) | Unauthenticated SQLi via PHP object injection (WordPress Events Manager < 7.3.7) | time-based blind |
 | [`timetics-cve-2026-14322`](./timetics-cve-2026-14322) | [CVE-2026-14322](https://intel.patrowl.io/cves/CVE-2026-14322) | Unauthenticated broken access control / payment bypass (WordPress Timetics < 1.0.57) | approved-booking response |
+| [`profilegrid-cve-2026-12688`](./profilegrid-cve-2026-12688) | [CVE-2026-12688](https://intel.patrowl.io/cves/CVE-2026-12688) | Unauthenticated PayPal IPN forgery / access control bypass (WordPress ProfileGrid ≤ 5.9.9.5) | membership-grant delta |
 | [`class-exam-timetabling-day-xss`](./class-exam-timetabling-day-xss) | [CVE-2026-16485](https://intel.patrowl.io/cves/CVE-2026-16485), [CVE-2026-16486](https://intel.patrowl.io/cves/CVE-2026-16486) | Reflected XSS (`day` param) in SourceCodester Class & Exam Timetabling System 1.0 | reflected markup |
 
 ## Layout
