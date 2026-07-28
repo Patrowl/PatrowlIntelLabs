@@ -1,0 +1,72 @@
+{
+  "id": "GHSA-w2j3-x3j3-mm43",
+  "title": "DefectDojo — Privilege Escalation via unguarded is_staff in API v2 user endpoint",
+  "severity": "high",
+  "cvss_score": 7.8,
+  "cvss_vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+  "cwe": "CWE-269",
+  "exposure": {
+    "protocol": "http",
+    "default_port": 443,
+    "ports": [443, 80, 8080, 8443]
+  },
+  "affected_technologies": [
+    {
+      "vendor": "defectdojo",
+      "product": "defectdojo",
+      "component": "API v2 user endpoint — dojo/api_v2/serializers.py UserSerializer.validate() (missing is_staff guard); Django admin site (/admin/) enabled by default",
+      "ecosystem": "pip",
+      "affected_versions": "<= 2.58.2 and 2.59.0",
+      "fixed_version": "2.58.3",
+      "additional_fixed_versions": ["2.58.4", "3.0.0"],
+      "cpe23": "cpe:2.3:a:defectdojo:defectdojo:*:*:*:*:*:*:*:*"
+    }
+  ],
+  "indicators_of_compromise": {
+    "urls_paths": [
+      "/api/v2/users/{id}/ (PATCH or PUT)",
+      "/admin/ and /admin/auth/user/{id}/change/"
+    ],
+    "request_signatures": [
+      "PATCH/PUT to /api/v2/users/<id>/ with a JSON body containing \"is_staff\": true, sent with a non-superuser API token",
+      "Immediately followed by access to /admin/ and a POST to /admin/auth/user/<id>/change/ toggling is_superuser"
+    ],
+    "behavioral": [
+      "A user account transitioning is_staff false->true, or is_superuser false->true, that was not performed by an existing superuser",
+      "Non-superuser accounts (holding only auth.change_user) accessing the Django admin site",
+      "Audit-log / DB entries where auth_user.is_staff or is_superuser changed via the API rather than the admin UI by a superuser"
+    ]
+  },
+  "vendor_advisory": {
+    "ghsa": "https://github.com/DefectDojo/django-DefectDojo/security/advisories/GHSA-w2j3-x3j3-mm43",
+    "fix_commit": "https://github.com/DefectDojo/django-DefectDojo/commit/68a272f299d096249fd3ba9c2676bf69012857bf",
+    "pull_request": "https://github.com/DefectDojo/django-DefectDojo/pull/14952"
+  },
+  "remediation": {
+    "primary_fix": "Upgrade DefectDojo to 2.58.3, 2.58.4, or 3.0.0 (or later).",
+    "steps": [
+      "Upgrade the DefectDojo containers/package to a fixed release (2.58.3 / 2.58.4 / 3.0.0+).",
+      "Audit auth_user for accounts with is_staff=1 or is_superuser=1 that should not have them and revoke; review who holds the 'Configuration -> Users (change)' (auth.change_user) permission.",
+      "Disable the Django admin site unless explicitly required (set DD_DJANGO_ADMIN_ENABLED=False), and ensure /admin/ is restricted to superusers."
+    ],
+    "mitigations": [
+      "Until upgraded, do NOT grant the auth.change_user / 'Configuration -> Users (change)' permission to non-superusers.",
+      "Set DD_DJANGO_ADMIN_ENABLED=False to remove the /admin/ escalation surface.",
+      "Front /api/v2/users/ and /admin/ with the WAF rule below to flag is_staff/is_superuser changes."
+    ]
+  },
+  "waf": {
+    "targets": [
+      { "location": "path", "param": "url", "value": "/api/v2/users/" },
+      { "location": "body", "param": "is_staff" },
+      { "location": "body", "param": "is_superuser" }
+    ],
+    "signatures": [
+      "(?i)/api/v2/users/\\d+/?",
+      "(?i)\"is_staff\"\\s*:\\s*true",
+      "(?i)\"is_superuser\"\\s*:\\s*true"
+    ],
+    "combine": "Alert/deny PATCH or PUT to /api/v2/users/<id>/ whose JSON body sets is_staff:true or is_superuser:true. Because a WAF cannot see the caller's superuser status, prefer alert-then-review, or scope the deny to tokens/sessions known to be non-admin.",
+    "false_positive_notes": "Legitimate superuser-driven user management also sets is_staff/is_superuser via the same endpoint, so a blanket block can break admin workflows — this is a coarse mitigation; the real fix is the vendor patch. Use it in monitor mode unless you can distinguish admin callers."
+  }
+}

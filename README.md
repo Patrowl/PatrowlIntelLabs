@@ -41,6 +41,7 @@ exposures before attackers do:
 | [`profilegrid-cve-2026-12688`](./profilegrid-cve-2026-12688) | [CVE-2026-12688](https://intel.patrowl.io/cves/CVE-2026-12688) | Unauthenticated PayPal IPN forgery / access control bypass (WordPress ProfileGrid ≤ 5.9.9.5) | membership-grant delta |
 | [`wazuh-cve-2026-39359`](./wazuh-cve-2026-39359) | [CVE-2026-39359](https://intel.patrowl.io/cves/CVE-2026-39359) | Unauthenticated authd enrollment path traversal (Wazuh Manager 4.0.0–4.14.4) | enrollment key issued (TLS/1515) |
 | [`opensis-cve-2026-11944`](./opensis-cve-2026-11944) | [CVE-2026-11944](https://intel.patrowl.io/cves/CVE-2026-11944) | Authenticated path traversal / arbitrary file read (openSIS Classic 9.3) | `/etc/passwd` in response |
+| [`defectdojo-ghsa-w2j3-x3j3-mm43`](./defectdojo-ghsa-w2j3-x3j3-mm43) | [GHSA-w2j3-x3j3-mm43](https://github.com/DefectDojo/django-DefectDojo/security/advisories/GHSA-w2j3-x3j3-mm43) | Authenticated API privilege escalation via unguarded `is_staff` (DefectDojo 2.59.0) | `is_staff` set as non-superuser |
 | [`class-exam-timetabling-day-xss`](./class-exam-timetabling-day-xss) | [CVE-2026-16485](https://intel.patrowl.io/cves/CVE-2026-16485), [CVE-2026-16486](https://intel.patrowl.io/cves/CVE-2026-16486) | Reflected XSS (`day` param) in SourceCodester Class & Exam Timetabling System 1.0 | reflected markup |
 
 ## Layout

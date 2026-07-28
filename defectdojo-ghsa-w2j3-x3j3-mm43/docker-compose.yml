@@ -1,0 +1,121 @@
+# Vulnerable DefectDojo 2.58.2 lab for GHSA-w2j3-x3j3-mm43
+# (API privilege escalation via is_staff).
+#
+# All images are pinned to 2.58.2 (pulled from Docker Hub, no local build).
+# The web UI / API is exposed on host port 8083 -> nginx:8080.
+---
+services:
+  nginx:
+    image: "defectdojo/defectdojo-nginx:2.58.2"
+    depends_on:
+      uwsgi:
+        condition: service_started
+    environment:
+      NGINX_METRICS_ENABLED: "false"
+      DD_UWSGI_HOST: "uwsgi"
+      DD_UWSGI_PORT: "3031"
+    volumes:
+      - defectdojo_media:/usr/share/nginx/html/media
+    ports:
+      - target: 8080
+        published: "8083"
+        protocol: tcp
+        mode: host
+
+  uwsgi:
+    image: "defectdojo/defectdojo-django:2.58.2"
+    depends_on:
+      initializer:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_started
+      valkey:
+        condition: service_started
+    entrypoint: ['/wait-for-it.sh', 'postgres:5432', '-t', '30', '--', '/entrypoint-uwsgi.sh']
+    environment:
+      DD_DEBUG: 'False'
+      DD_DJANGO_METRICS_ENABLED: "False"
+      DD_ALLOWED_HOSTS: "*"
+      # Django admin (/admin/) is enabled by default on this vulnerable build.
+      DD_DJANGO_ADMIN_ENABLED: "True"
+      DD_DATABASE_URL: postgresql://defectdojo:defectdojo@postgres:5432/defectdojo
+      DD_CELERY_BROKER_URL: redis://valkey:6379/0
+      DD_SECRET_KEY: "hhZCp@D28z!n@NED*yB!ROMt+WzsY*iq"
+      DD_CREDENTIAL_AES_256_KEY: "&91a*agLqesc*0DJ+2*bAbsUZfR*4nLw"
+      DD_DATABASE_READINESS_TIMEOUT: "30"
+    volumes:
+      - "defectdojo_media:/app/media"
+
+  celerybeat:
+    image: "defectdojo/defectdojo-django:2.58.2"
+    depends_on:
+      initializer:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_started
+      valkey:
+        condition: service_started
+    entrypoint: ['/wait-for-it.sh', 'postgres:5432', '-t', '30', '--', '/entrypoint-celery-beat.sh']
+    environment:
+      DD_DATABASE_URL: postgresql://defectdojo:defectdojo@postgres:5432/defectdojo
+      DD_CELERY_BROKER_URL: redis://valkey:6379/0
+      DD_SECRET_KEY: "hhZCp@D28z!n@NED*yB!ROMt+WzsY*iq"
+      DD_CREDENTIAL_AES_256_KEY: "&91a*agLqesc*0DJ+2*bAbsUZfR*4nLw"
+      DD_DATABASE_READINESS_TIMEOUT: "30"
+
+  celeryworker:
+    image: "defectdojo/defectdojo-django:2.58.2"
+    depends_on:
+      initializer:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_started
+      valkey:
+        condition: service_started
+    entrypoint: ['/wait-for-it.sh', 'postgres:5432', '-t', '30', '--', '/entrypoint-celery-worker.sh']
+    environment:
+      DD_DATABASE_URL: postgresql://defectdojo:defectdojo@postgres:5432/defectdojo
+      DD_CELERY_BROKER_URL: redis://valkey:6379/0
+      DD_SECRET_KEY: "hhZCp@D28z!n@NED*yB!ROMt+WzsY*iq"
+      DD_CREDENTIAL_AES_256_KEY: "&91a*agLqesc*0DJ+2*bAbsUZfR*4nLw"
+      DD_DATABASE_READINESS_TIMEOUT: "30"
+    volumes:
+      - "defectdojo_media:/app/media"
+
+  initializer:
+    image: "defectdojo/defectdojo-django:2.58.2"
+    depends_on:
+      postgres:
+        condition: service_started
+    entrypoint: ['/wait-for-it.sh', 'postgres:5432', '--', '/entrypoint-initializer.sh']
+    environment:
+      DD_DATABASE_URL: postgresql://defectdojo:defectdojo@postgres:5432/defectdojo
+      DD_ADMIN_USER: "admin"
+      DD_ADMIN_MAIL: "admin@defectdojo.local"
+      DD_ADMIN_PASSWORD: "Admin#12345"
+      DD_ADMIN_FIRST_NAME: "Admin"
+      DD_ADMIN_LAST_NAME: "User"
+      DD_INITIALIZE: "true"
+      DD_SECRET_KEY: "hhZCp@D28z!n@NED*yB!ROMt+WzsY*iq"
+      DD_CREDENTIAL_AES_256_KEY: "&91a*agLqesc*0DJ+2*bAbsUZfR*4nLw"
+      DD_DATABASE_READINESS_TIMEOUT: "30"
+
+  postgres:
+    image: postgres:18.3-alpine
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_DB: defectdojo
+      POSTGRES_USER: defectdojo
+      POSTGRES_PASSWORD: defectdojo
+    volumes:
+      - defectdojo_postgres:/var/lib/postgresql/data
+
+  valkey:
+    image: valkey/valkey:9.0.3-alpine
+    volumes:
+      - defectdojo_redis:/data
+
+volumes:
+  defectdojo_postgres: {}
+  defectdojo_media: {}
+  defectdojo_redis: {}
