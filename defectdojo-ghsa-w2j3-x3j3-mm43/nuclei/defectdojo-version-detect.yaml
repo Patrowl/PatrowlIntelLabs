@@ -1,0 +1,60 @@
+id: defectdojo-vulnerable-version-detect
+
+info:
+  name: "DefectDojo — vulnerable version detection (2.59.0, GHSA-w2j3-x3j3-mm43)"
+  author: "Patrowl Security Team"
+  severity: high
+  description: |
+    Fingerprints DefectDojo unauthenticated (login page branding + footer version)
+    and flags the version affected by GHSA-w2j3-x3j3-mm43 (API privilege escalation
+    via unguarded is_staff): DefectDojo 2.59.0. The extracted version is reported
+    for any DefectDojo instance so the same template doubles as a tech/version
+    fingerprint; the match only fires on the vulnerable 2.59.0.
+  reference:
+    - https://github.com/DefectDojo/django-DefectDojo/security/advisories/GHSA-w2j3-x3j3-mm43
+    - https://github.com/DefectDojo/django-DefectDojo/commit/68a272f299d096249fd3ba9c2676bf69012857bf
+  classification:
+    cvss-metrics: CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H
+    cwe-id: CWE-269
+  metadata:
+    verified: true
+    detection-mode: remote
+    vendor: defectdojo
+    product: defectdojo
+    ecosystem: pip
+    fixed-version: "2.58.3"
+    shodan-query: 'http.title:"DefectDojo"'
+  tags: defectdojo,tech,version,fingerprint,ghsa
+
+http:
+  - method: GET
+    path:
+      # The login page is always reachable unauthenticated and its footer prints
+      # "v. <version> ( <mode> )". (Alternative source: the unauthenticated
+      # OpenAPI schema at /api/v2/oa3/schema/?format=json -> info.version.)
+      - "{{BaseURL}}/login?next=/"
+
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "DefectDojo"
+
+      - type: regex
+        part: body
+        regex:
+          - "v\\.\\s*[0-9]+\\.[0-9]+\\.[0-9]+"
+
+      # Fire only on the affected version.
+      - type: dsl
+        dsl:
+          - 'compare_versions(version, "= 2.59.0")'
+
+    extractors:
+      - type: regex
+        name: version
+        part: body
+        group: 1
+        regex:
+          - "v\\.\\s*([0-9]+\\.[0-9]+\\.[0-9]+)"

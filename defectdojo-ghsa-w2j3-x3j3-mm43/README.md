@@ -73,6 +73,21 @@ The template resolves the token's own user id (`/api/v2/user_profile/`), sends
 (patched builds return 400 with the guard message). A **third request reverts
 `is_staff` to false** so the check leaves the account as it found it.
 
+### Passive version detection (no auth, no token)
+
+`nuclei/defectdojo-version-detect.yaml` fingerprints DefectDojo unauthenticated
+(login-page branding + footer `v. <version>`) and flags the **affected 2.59.0**:
+
+```bash
+nuclei -t nuclei/defectdojo-version-detect.yaml -u http://127.0.0.1:8083
+# -> [defectdojo-vulnerable-version-detect] [high] .../login?next=/ ["2.59.0"]
+```
+
+It extracts and reports the version for any DefectDojo host, but only matches on
+2.59.0 (`compare_versions(version, "= 2.59.0")`); patched builds (2.58.3/2.58.4/
+3.0.0) do not match. Alternative unauthenticated version source: the OpenAPI
+schema at `/api/v2/oa3/schema/?format=json` (`info.version`).
+
 **Notes**
 - Requires a valid low-priv token (this is an authenticated, post-auth privesc).
 - The escalate→revert is net-zero on success; if interrupted between steps the
