@@ -44,6 +44,7 @@ exposures before attackers do:
 | [`defectdojo-ghsa-w2j3-x3j3-mm43`](./defectdojo-ghsa-w2j3-x3j3-mm43) | [GHSA-w2j3-x3j3-mm43](https://github.com/DefectDojo/django-DefectDojo/security/advisories/GHSA-w2j3-x3j3-mm43) | Authenticated API privilege escalation via unguarded `is_staff` (DefectDojo 2.59.0) | `is_staff` set as non-superuser |
 | [`class-exam-timetabling-day-xss`](./class-exam-timetabling-day-xss) | [CVE-2026-16485](https://intel.patrowl.io/cves/CVE-2026-16485), [CVE-2026-16486](https://intel.patrowl.io/cves/CVE-2026-16486) | Reflected XSS (`day` param) in SourceCodester Class & Exam Timetabling System 1.0 | reflected markup |
 | [`milk-admin-cve-2026-51565`](./milk-admin-cve-2026-51565) | [CVE-2026-51565](https://intel.patrowl.io/cves/CVE-2026-51565) | Authenticated reflected XSS (`action` param) in Milk Admin ≤ 0.9.8 | reflected markup (after admin login) |
+| [`urllib3-cve-2026-44432`](./urllib3-cve-2026-44432) | [CVE-2026-44432](https://intel.patrowl.io/cves/CVE-2026-44432) | Client-side streaming decompression-bomb DoS (urllib3 ≥ 2.6.0, < 2.7.0) | client-side PoC — memory blow-up (no remote detector) |
 
 ## Layout
 
