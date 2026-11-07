@@ -44,6 +44,8 @@ exposures before attackers do:
 | [`defectdojo-ghsa-w2j3-x3j3-mm43`](./defectdojo-ghsa-w2j3-x3j3-mm43) | [GHSA-w2j3-x3j3-mm43](https://github.com/DefectDojo/django-DefectDojo/security/advisories/GHSA-w2j3-x3j3-mm43) | Authenticated API privilege escalation via unguarded `is_staff` (DefectDojo 2.59.0) | `is_staff` set as non-superuser |
 | [`class-exam-timetabling-day-xss`](./class-exam-timetabling-day-xss) | [CVE-2026-16485](https://intel.patrowl.io/cves/CVE-2026-16485), [CVE-2026-16486](https://intel.patrowl.io/cves/CVE-2026-16486) | Reflected XSS (`day` param) in SourceCodester Class & Exam Timetabling System 1.0 | reflected markup |
 | [`milk-admin-cve-2026-51565`](./milk-admin-cve-2026-51565) | [CVE-2026-51565](https://intel.patrowl.io/cves/CVE-2026-51565) | Authenticated reflected XSS (`action` param) in Milk Admin ≤ 0.9.8 | reflected markup (after admin login) |
+| [`geodirectory-2.8.193`](./geodirectory-2.8.193) | [CVE-2026-113490](https://intel.patrowl.io/cves/CVE-2026-113490), [CVE-2026-113491](https://intel.patrowl.io/cves/CVE-2026-113491), [CVE-2026-113674](https://intel.patrowl.io/cves/CVE-2026-113674) | Unauth listing disclosure, Subscriber+ path traversal, and unauth guest-listing access control (WordPress GeoDirectory < 2.8.194) | scripted PoC (exploit validator per CVE) |
+| [`asvereinbase-cve-2026-110956`](./asvereinbase-cve-2026-110956) | [CVE-2026-110956](https://intel.patrowl.io/cves/CVE-2026-110956) | Unauthenticated authentication bypass via 2FA validation — log in as any user (WordPress asVereinbase < 1.1.8) | scripted PoC (exploit validator) |
 
 ## Layout
 

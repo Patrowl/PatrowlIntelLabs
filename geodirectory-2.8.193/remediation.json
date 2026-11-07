@@ -1,0 +1,124 @@
+{
+  "cves": ["CVE-2026-113490", "CVE-2026-113491", "CVE-2026-113674"],
+  "title": "GeoDirectory (WordPress) < 2.8.194 — listing disclosure, path traversal, and guest-listing broken access control",
+  "affected_technologies": [
+    {
+      "vendor": "ayecode",
+      "product": "geodirectory",
+      "ecosystem": "wordpress",
+      "cpe23": "cpe:2.3:a:ayecode:geodirectory:*:*:*:*:*:wordpress:*:*",
+      "purl": "pkg:wordpress/geodirectory",
+      "affected_versions": "< 2.8.194",
+      "fixed_version": "2.8.194",
+      "note": "All three issues are fixed in GeoDirectory 2.8.194."
+    }
+  ],
+  "exposure": {
+    "default_tcp_port": 443,
+    "tcp_ports": [443, 80, 8080, 8089],
+    "protocol": "http",
+    "note": "Any WordPress site running GeoDirectory < 2.8.194."
+  },
+  "vendor_advisory": [
+    "https://wpscan.com/vulnerability/2901f8f3-0b35-4565-b248-6c0dfc5de894/",
+    "https://wpscan.com/vulnerability/ba2114a5-01e3-40e7-a7f6-673674b6501d/",
+    "https://wpscan.com/vulnerability/23e66ca1-50eb-4ac1-9f5f-f830235c5af0/",
+    "https://wordpress.org/plugins/geodirectory/#developers",
+    "https://intel.patrowl.io/cves/CVE-2026-113490",
+    "https://intel.patrowl.io/cves/CVE-2026-113491",
+    "https://intel.patrowl.io/cves/CVE-2026-113674"
+  ],
+  "remediation": {
+    "primary": "Upgrade GeoDirectory to 2.8.194 or later.",
+    "steps": [
+      "Update the GeoDirectory plugin to >= 2.8.194 on every site.",
+      "Review draft/pending/private listings that may have been read via the markers REST route while running an affected version.",
+      "Audit guest-submitted (post_author = 0) listings for unauthorized edits, re-categorisation, or trashing.",
+      "Check the uploads directory and server logs for unexpected republished files and for files deleted via listing saves."
+    ],
+    "mitigations_if_upgrade_impossible": [
+      "Disable guest posting (GeoDirectory 'Allow posting without logging in?' / post_logged_out) to remove the CVE-2026-113674 attack surface.",
+      "Block unauthenticated access to /wp-json/geodir/v2/markers/<id> at the edge (it is only needed for map popups of public listings).",
+      "Restrict who can submit/edit listings and monitor admin-ajax.php geodir_save_post / geodir_auto_save_post."
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2026-113490",
+      "aliases": ["WPVDB-2901f8f3-0b35-4565-b248-6c0dfc5de894"],
+      "title": "Unauthenticated non-public listing disclosure via marker-popup REST route",
+      "severity": "medium",
+      "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+      "cvss_score": 5.3,
+      "cwe": ["CWE-200"],
+      "component": "includes/api/class-geodir-rest-markers-controller.php (get_marker_item / get_marker_item_permissions_check)",
+      "preconditions": ["GeoDirectory active with default settings.", "One or more non-public gd_place listings exist (ids are sequential/enumerable)."],
+      "indicators_of_compromise": {
+        "log_monitoring_urls": ["/wp-json/geodir/v2/markers/", "/?rest_route=/geodir/v2/markers/"],
+        "request_signatures": ["Unauthenticated GET to /wp-json/geodir/v2/markers/<numeric id>, especially sequential id enumeration."],
+        "behavioral": ["200 responses from the markers route for listing ids that return 404 on the front end."]
+      },
+      "waf": {
+        "strategy": "block",
+        "default_action": "block",
+        "target_paths": ["/wp-json/geodir/v2/markers/*", "/wp-json/geodir/v*/markers/*"],
+        "target_methods": ["GET"],
+        "signatures": ["request path matches ^/wp-json/geodir/v[0-9]+/markers/[0-9]+$ from an unauthenticated client"],
+        "combine": "AND",
+        "false_positive_notes": "Legitimate map popups also use this route; prefer upgrading. If blocking, allow it only for known-public listing ids or from the site's own map pages."
+      }
+    },
+    {
+      "cve": "CVE-2026-113491",
+      "aliases": ["WPVDB-ba2114a5-01e3-40e7-a7f6-673674b6501d"],
+      "title": "Authenticated (Subscriber+) path traversal via listing-save image URL (arbitrary file read/republish and delete)",
+      "severity": "medium",
+      "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:L/I:L/A:N",
+      "cvss_score": 6.4,
+      "cwe": ["CWE-22"],
+      "component": "includes/class-geodir-media.php (get_external_media / temp-file handling)",
+      "preconditions": ["Subscriber (or higher) account.", "Default Add Listing page and gd_place type.", "uploads/geodir_temp directory exists."],
+      "indicators_of_compromise": {
+        "log_monitoring_urls": ["/wp-admin/admin-ajax.php"],
+        "request_signatures": ["admin-ajax.php action=geodir_save_post with a post_images entry whose URL contains '/geodir_temp/' followed by '../'.", "Image URLs pointing at /geodir_temp/ with path-traversal sequences and an image extension."],
+        "behavioral": ["Files appearing in uploads whose source is outside the uploads tree.", "Unexpected deletion of image-named files on the server during listing saves."]
+      },
+      "waf": {
+        "strategy": "block",
+        "default_action": "block",
+        "target_paths": ["/wp-admin/admin-ajax.php"],
+        "target_methods": ["POST"],
+        "target_parameters": ["post_images", "action"],
+        "signatures": ["action=geodir_save_post|geodir_auto_save_post AND a post_images value matching geodir_temp/.*\\.\\."],
+        "combine": "AND",
+        "false_positive_notes": "Legitimate saves reference geodir_temp files by plain filename with no '..'; the '..' sequence is the reliable signal."
+      }
+    },
+    {
+      "cve": "CVE-2026-113674",
+      "aliases": ["WPVDB-23e66ca1-50eb-4ac1-9f5f-f830235c5af0"],
+      "title": "Unauthenticated broken access control over guest-submitted listings",
+      "severity": "low",
+      "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+      "cvss_score": 3.7,
+      "cwe": ["CWE-284"],
+      "component": "includes/class-geodir-post-data.php (can_edit / owner_check)",
+      "preconditions": ["WordPress registration enabled.", "GeoDirectory 'Allow posting without logging in?' (post_logged_out) enabled.", "At least one guest-submitted listing (post_author = 0)."],
+      "indicators_of_compromise": {
+        "log_monitoring_urls": ["/wp-admin/admin-ajax.php", "/add-listing/"],
+        "request_signatures": ["Unauthenticated admin-ajax.php action=geodir_save_post / geodir_auto_save_post referencing an existing listing ID (post_status=trash, changed post_title/post_category)."],
+        "behavioral": ["Guest listings changing title/category/status with no corresponding owner session.", "Listings with post_author=0 being trashed or edited by logged-out requests."]
+      },
+      "waf": {
+        "strategy": "block",
+        "default_action": "block",
+        "target_paths": ["/wp-admin/admin-ajax.php"],
+        "target_methods": ["POST"],
+        "target_parameters": ["action", "ID", "post_status"],
+        "signatures": ["Unauthenticated (no logged-in cookie) POST with action=geodir_save_post or geodir_auto_save_post that includes an existing ID"],
+        "combine": "AND",
+        "false_positive_notes": "Only relevant when guest posting is enabled; disabling post_logged_out is the most reliable mitigation."
+      }
+    }
+  ]
+}
