@@ -1,0 +1,4 @@
+# Downloaded at setup time by setup.sh (do not commit the plugin source)
+plugin/
+.lab-ids
+__pycache__/

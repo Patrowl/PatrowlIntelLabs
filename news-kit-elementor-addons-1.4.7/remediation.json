@@ -1,0 +1,133 @@
+{
+  "cves": [
+    "CVE-2026-97352",
+    "CVE-2026-97353"
+  ],
+  "title": "News Kit Addons For Elementor < 1.4.9 — Subscriber+ missing authorization (plugin install/activate + arbitrary post-meta write)",
+  "severity": "medium",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:L",
+  "cvss_score": 5.4,
+  "cwe": [
+    "CWE-862"
+  ],
+  "exposure": {
+    "default_tcp_port": 443,
+    "tcp_ports": [
+      443,
+      80,
+      8443,
+      8080
+    ],
+    "protocol": "http",
+    "note": "WordPress front controller. Both actions are reachable at /wp-admin/admin-ajax.php by any authenticated Subscriber+; the required nonce leaks on every wp-admin page via the plugin's admin script loader."
+  },
+  "affected_technologies": [
+    {
+      "vendor": "blazethemes",
+      "product": "News Kit Addons For Elementor",
+      "ecosystem": "wordpress-plugin",
+      "plugin_slug": "news-kit-elementor-addons",
+      "cpe23": "cpe:2.3:a:blazethemes:news-kit-elementor-addons:*:*:*:*:*:wordpress:*:*",
+      "purl": "pkg:wordpress/news-kit-elementor-addons",
+      "cpe_version_range": {
+        "introduced": "0",
+        "fixed": "1.4.9"
+      },
+      "affected_versions": "< 1.4.9",
+      "fixed_version": "1.4.9",
+      "note": "Both flaws confirmed against 1.4.7. WPScan lists CVE-2026-97352 as fixed in 1.4.9 and CVE-2026-97353 as <= 1.4.7 'no known fix', but the 1.4.9 release adds a capability check to update_mega_menu_form() as well, so 1.4.9 fixes both."
+    },
+    {
+      "vendor": "wordpress",
+      "product": "WordPress",
+      "ecosystem": "cms",
+      "cpe23": "cpe:2.3:a:wordpress:wordpress:*:*:*:*:*:*:*:*",
+      "note": "Host CMS running the vulnerable plugin."
+    }
+  ],
+  "preconditions": [
+    "News Kit Addons For Elementor < 1.4.9 active (Elementor active is the realistic deployment; the plugin localizes its admin nonce once Elementor is loaded).",
+    "The attacker holds an account with at least the Subscriber role (able to load a wp-admin page such as profile.php to read the leaked nonce).",
+    "CVE-2026-97352 additionally requires outbound access to downloads.wordpress.org and that blaze-demo-importer is not already installed."
+  ],
+  "indicators_of_compromise": {
+    "log_monitoring_urls": [
+      {
+        "path": "/wp-admin/admin-ajax.php",
+        "method": "POST",
+        "query_or_body": "action=nekit_install_importer",
+        "reason": "CVE-2026-97352 — installs/activates the blaze-demo-importer plugin."
+      },
+      {
+        "path": "/wp-admin/admin-ajax.php",
+        "method": "POST",
+        "query_or_body": "action=nekit_update_mega_menu_form",
+        "reason": "CVE-2026-97353 — writes attacker-chosen post meta (menu=<post id>, formData=[{name,value}])."
+      }
+    ],
+    "request_body_signatures": [
+      "action=nekit_install_importer with option=install|activate on an admin-ajax.php POST.",
+      "action=nekit_update_mega_menu_form with a menu=<numeric post id> and a formData JSON array of {\"name\":...,\"value\":...} entries.",
+      "Either action invoked from an authenticated session whose user lacks install_plugins / edit_theme_options (Subscriber/Contributor/Author)."
+    ],
+    "behavioral": [
+      "blaze-demo-importer appearing in the installed/active plugin list without an administrator action.",
+      "Unexpected post meta written to posts (arbitrary keys, or protected core keys such as _wp_page_template) not matching any editorial change.",
+      "nekit_* admin AJAX calls originating from Subscriber/Contributor/Author sessions.",
+      "A Subscriber session loading wp-admin pages (profile.php) and then issuing nekit_* AJAX writes."
+    ]
+  },
+  "vendor_advisory": [
+    "https://wordpress.org/plugins/news-kit-elementor-addons/",
+    "https://plugins.trac.wordpress.org/browser/news-kit-elementor-addons/",
+    "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-97352",
+    "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-97353",
+    "https://intel.patrowl.io/cves/CVE-2026-97352",
+    "https://intel.patrowl.io/cves/CVE-2026-97353"
+  ],
+  "remediation": {
+    "primary": "Upgrade News Kit Addons For Elementor to >= 1.4.9.",
+    "steps": [
+      "Update the plugin to 1.4.9 or later (WP Admin > Plugins, or wp plugin update news-kit-elementor-addons). 1.4.9 adds capability checks to the admin AJAX handlers (install_plugins/activate_plugins on install_importer, edit_theme_options on update_mega_menu_form) and stops printing the nekit-admin-nonce to lower-privilege roles.",
+      "Audit the plugin list for blaze-demo-importer and remove it if it was not installed deliberately.",
+      "Review posts for unexpected or protected post meta (e.g. _wp_page_template) written by non-editorial accounts.",
+      "Review access logs for admin-ajax.php POSTs carrying action=nekit_install_importer or action=nekit_update_mega_menu_form from non-administrator sessions, and audit low-privilege (Subscriber/Contributor) accounts."
+    ],
+    "mitigations_if_upgrade_impossible": [
+      "Deploy the WAF virtual patch below to block the nekit_install_importer and nekit_update_mega_menu_form actions for non-administrator sessions.",
+      "Restrict or review self-registration so untrusted users cannot obtain Subscriber accounts.",
+      "Block direct access to /wp-admin/admin-ajax.php for the nekit_* state-changing actions at the edge where only administrators are expected to use them."
+    ]
+  },
+  "waf": {
+    "strategy": "virtual-patch",
+    "default_action": "block",
+    "target_paths": [
+      "/wp-admin/admin-ajax.php"
+    ],
+    "target_methods": [
+      "POST"
+    ],
+    "target_parameters": [
+      "action"
+    ],
+    "signatures": [
+      {
+        "id": "nekit-install-importer",
+        "location": "request_body",
+        "applies_to_param": "action",
+        "regex": "(?i)^\\s*nekit_install_importer\\s*$",
+        "description": "CVE-2026-97352 — plugin install/activate action lacking a capability check in < 1.4.9."
+      },
+      {
+        "id": "nekit-update-mega-menu-form",
+        "location": "request_body",
+        "applies_to_param": "action",
+        "regex": "(?i)^\\s*nekit_update_mega_menu_form\\s*$",
+        "description": "CVE-2026-97353 — arbitrary post-meta write action lacking a capability check in <= 1.4.7."
+      }
+    ],
+    "combine": "block any POST to /wp-admin/admin-ajax.php where action is nekit_install_importer or nekit_update_mega_menu_form unless the session belongs to an administrator.",
+    "false_positive_notes": "Legitimate use of these actions comes only from administrators on the plugin's own screens. After upgrading to 1.4.9 the plugin enforces capability checks server-side, so blocking non-admin callers is safe."
+  }
+}
