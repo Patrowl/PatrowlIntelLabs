@@ -1,0 +1,149 @@
+{
+  "cves": [
+    "CVE-2026-45567"
+  ],
+  "advisories": [
+    "GHSA-hqf9-xcvr-7xj5"
+  ],
+  "title": "Roxy-WI <= 8.2.6.4 — Unauthenticated Root RCE (?api=1 auth bypass -> /scheduler/jobs os.system)",
+  "severity": "critical",
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+  "cvss_score": 9.8,
+  "cwe": [
+    "CWE-78",
+    "CWE-287"
+  ],
+  "exposure": {
+    "default_tcp_port": 8080,
+    "tcp_ports": [
+      8080,
+      8443,
+      443
+    ],
+    "protocol": "http",
+    "note": "Roxy-WI web interface. The advisory demonstrates the attack on port 8080; deployments also front it on 8443/443. The vulnerable routes are the flask_apscheduler /scheduler/* API plus the whitelisted /static/* read-back, reachable unauthenticated by appending ?api=1."
+  },
+  "affected_technologies": [
+    {
+      "vendor": "roxy-wi",
+      "product": "Roxy-WI",
+      "ecosystem": "pip",
+      "repository": "https://github.com/roxy-wi/roxy-wi",
+      "cpe23": "cpe:2.3:a:roxy-wi:roxy-wi:*:*:*:*:*:*:*:*",
+      "purl": "pkg:pypi/roxy-wi",
+      "cpe_version_range": {
+        "introduced": "0",
+        "fixed": null
+      },
+      "affected_versions": "<= 8.2.6.4",
+      "fixed_version": null,
+      "note": "The advisory lists 'Patched versions: None'. Verified at source: the described bug (app/login.py:19 `if 'api' not in request.url`) is present verbatim at the v8.2.6.4 tag. The master branch has already replaced it with a proper endpoint allow-list + JWT validation, so current master is NOT vulnerable to the described bypass; the advisory's cited master commit 7744ecf5f53955f3c0036ddd52f539930ef24b36 already contains the hardened code. The repo documents Roxy-WI 9.1+/Helm 10.1.0, newer than the affected range. Confirm the running version against 8.2.6.4 rather than assuming all deployments are affected."
+    }
+  ],
+  "preconditions": [
+    "A Roxy-WI instance at or below 8.2.6.4 (code containing app/login.py:19 substring auth check) reachable over HTTP(S).",
+    "Default configuration: SCHEDULER_API_ENABLED=True with no SCHEDULER_AUTH, flask_apscheduler started (app/__init__.py). These are the shipped defaults.",
+    "No credentials required."
+  ],
+  "unverified": {
+    "cve_mapping": "GHSA-hqf9-xcvr-7xj5 has no CVE in its CVE field; the auth-bypass root cause is attributed to CVE-2026-45567 in the advisory body. The RCE-chain advisory itself is tracked here by its GHSA id. Treat the CVE association as asserted, not confirmed from NVD (NVD was not machine-readable at build time).",
+    "fixed_version": "No fixed release is named. The bypass is absent on current master, but the exact first-fixed release/tag was not established."
+  },
+  "indicators_of_compromise": {
+    "log_monitoring_urls": [
+      {
+        "path": "/scheduler/jobs",
+        "method": "POST",
+        "query_or_body": "any request whose URL query string contains 'api' (e.g. ?api=1), with a JSON body containing \"func\":\"os:system\" (or os:popen, subprocess:*, builtins:*, nt:system)",
+        "reason": "Registration of an OS-command job through the unauthenticated scheduler API is the core exploit step."
+      },
+      {
+        "path": "/scheduler/jobs/*/run",
+        "method": "POST",
+        "query_or_body": "URL contains 'api'",
+        "reason": "Synchronous trigger of a scheduler job without authentication — the execution step."
+      },
+      {
+        "path": "/static/*",
+        "method": "GET",
+        "query_or_body": "URL contains 'api' and references a file that is not a normal static asset (e.g. rwi_*.txt, *_id.txt, *_shadow.txt)",
+        "reason": "Read-back of command output written into the whitelisted static directory."
+      }
+    ],
+    "request_body_signatures": [
+      "Any authenticated-looking action reached with 'api' in the query string on a non-API route (the bypass primitive): e.g. GET/POST .../scheduler/...?api=1, ...?x=api.",
+      "A /scheduler/jobs body with \"func\" set to a dangerous callable reference such as os:system, os:popen, subprocess:run, subprocess:Popen, builtins:exec, builtins:eval, nt:system, posix:system."
+    ],
+    "behavioral": [
+      "Scheduler jobs whose func is not one of the application's own app.jobs:* functions.",
+      "Files appearing under the app static directory that are command output (id/whoami/shadow dumps) rather than assets.",
+      "New cron entries, authorized_keys additions, or outbound connections from the Roxy-WI host shortly after /scheduler/jobs activity.",
+      "flask_apscheduler executing a job immediately after a /run call from an unauthenticated session."
+    ]
+  },
+  "vendor_advisory": [
+    "https://github.com/roxy-wi/roxy-wi/security/advisories/GHSA-hqf9-xcvr-7xj5",
+    "https://nvd.nist.gov/vuln/detail/CVE-2026-45567",
+    "https://intel.patrowl.io/cves/CVE-2026-45567",
+    "https://cwe.mitre.org/data/definitions/78.html"
+  ],
+  "remediation": {
+    "primary": "Upgrade Roxy-WI to a build whose app/login.py uses the endpoint allow-list + JWT validation (current master / 9.x+) instead of the `if 'api' not in request.url` substring check.",
+    "steps": [
+      "Update Roxy-WI to the latest release (the repo documents 9.1+ and Helm chart 10.1.0). Confirm app/login.py no longer contains `'api' not in request.url` and that /scheduler/* requires authentication.",
+      "Treat any instance that ran <= 8.2.6.4 as compromised: it allowed unauthenticated root command execution. Investigate for planted cron jobs, SSH authorized_keys, new users, and modified binaries.",
+      "Rotate all secrets reachable from the host: the Roxy-WI JWT keys (/var/lib/roxy-wi/keys/*), DB credentials, managed HAProxy/Nginx/Keepalived host SSH keys and passwords, and rotate OS credentials since /etc/shadow was readable.",
+      "If the scheduler API is not needed, set SCHEDULER_API_ENABLED=False (or configure SCHEDULER_AUTH) so the /scheduler/* routes are not exposed.",
+      "Review web/access logs for 'api' appearing in query strings on non-API routes and for POSTs to /scheduler/jobs and /scheduler/jobs/*/run."
+    ],
+    "mitigations_if_upgrade_impossible": [
+      "At the reverse proxy / WAF, block requests that carry an 'api' token in the query string on non-API paths, and block all external access to /scheduler/* and to /static/* requests that reference non-asset filenames.",
+      "Disable the scheduler API (SCHEDULER_API_ENABLED=False) or require SCHEDULER_AUTH.",
+      "Restrict network access to the Roxy-WI interface to trusted management hosts only; never expose it to untrusted networks.",
+      "Run the Roxy-WI process as a non-root, least-privilege account to reduce blast radius."
+    ]
+  },
+  "waf": {
+    "strategy": "virtual-patch",
+    "default_action": "block",
+    "target_paths": [
+      "/scheduler/*",
+      "/static/*"
+    ],
+    "target_methods": [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+    ],
+    "target_parameters": [
+      "func"
+    ],
+    "signatures": [
+      {
+        "id": "roxywi-api-querystring-bypass",
+        "location": "request_uri",
+        "applies_to_param": "query",
+        "regex": "(?i)[?&][^=&]*=?[^&]*\\bapi\\b|(?i)[?&].*api",
+        "description": "The auth-bypass primitive: an 'api' substring anywhere in the query string of a non-API route. Primary signal is any ?api= / =api on /scheduler/* or /static/*."
+      },
+      {
+        "id": "roxywi-scheduler-dangerous-func",
+        "location": "request_body",
+        "applies_to_param": "func",
+        "regex": "(?i)\"func\"\\s*:\\s*\"(os|posix|nt|subprocess|builtins|pty|commands|popen2)\\s*:",
+        "description": "A scheduler job whose func resolves to an OS-command / code-exec callable (os:system, subprocess:run, builtins:exec, ...). No legitimate dashboard job uses these."
+      },
+      {
+        "id": "roxywi-scheduler-run-endpoint",
+        "location": "request_uri",
+        "applies_to_param": "path",
+        "regex": "/scheduler/jobs/[^/]+/run",
+        "description": "Synchronous job trigger. Combined with the ?api bypass this is the execution step; block/alert when reached without an authenticated session."
+      }
+    ],
+    "combine": "block any request to /scheduler/* or /static/* whose query string contains an 'api' token (the bypass), and independently block any /scheduler/jobs body whose func targets os/subprocess/builtins/etc.",
+    "false_positive_notes": "Roxy-WI's legitimate frontend reaches the scheduler through the authenticated, blueprinted API, not by sprinkling 'api' into the query string of /scheduler or /static routes, so blocking that pattern on those paths is safe. Dangerous func prefixes (os:, subprocess:, builtins:, ...) are never used by the application's own jobs (app.jobs:*)."
+  }
+}

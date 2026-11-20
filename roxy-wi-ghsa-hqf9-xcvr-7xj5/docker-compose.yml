@@ -1,0 +1,11 @@
+services:
+  roxy-wi:
+    build: .
+    image: roxy-wi-ghsa-hqf9-xcvr-7xj5
+    container_name: roxy-wi-ghsa-hqf9-xcvr-7xj5
+    ports:
+      - "8088:8080"
+    environment:
+      # 0 = vulnerable (v8.2.6.4 login.py:19 substring bypass) · 1 = fixed (master allow-list)
+      #   PATCHED=1 docker compose up -d --build --force-recreate
+      PATCHED: "${PATCHED:-0}"

